@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<COLLADA xmlns="http://www.collada.org/2005/11/COLLADASchema" version="1.4.1">
+  <asset><unit meter="0.01" name="centimeter"/><up_axis>Z_UP</up_axis></asset>
+  <library_geometries><geometry id="geo" name="quad"><mesh>
+    <source id="pos"><float_array id="pos-array" count="12">0 0 0 1 0 0 1 1 0 0 1 0</float_array><technique_common><accessor source="#pos-array" count="4" stride="3"><param name="X" type="float"/><param name="Y" type="float"/><param name="Z" type="float"/></accessor></technique_common></source>
+    <source id="normal"><float_array id="normal-array" count="3">0 0 1</float_array><technique_common><accessor source="#normal-array" count="1" stride="3"><param name="X" type="float"/><param name="Y" type="float"/><param name="Z" type="float"/></accessor></technique_common></source>
+    <source id="uv"><float_array id="uv-array" count="8">0 0 1 0 1 1 0 1</float_array><technique_common><accessor source="#uv-array" count="4" stride="2"><param name="S" type="float"/><param name="T" type="float"/></accessor></technique_common></source>
+    <vertices id="verts"><input semantic="POSITION" source="#pos"/></vertices>
+    <triangles count="1" material="blue"><input semantic="VERTEX" source="#verts" offset="0"/><input semantic="NORMAL" source="#normal" offset="1"/><input semantic="TEXCOORD" source="#uv" offset="2" set="0"/><p>0 0 0 1 0 1 2 0 2</p></triangles>
+    <polylist count="1"><input semantic="VERTEX" source="#verts" offset="0"/><vcount>4</vcount><p>0 1 2 3</p></polylist>
+  </mesh></geometry></library_geometries>
+  <library_controllers><controller id="skin"><skin source="#geo"><bind_shape_matrix>1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1</bind_shape_matrix>
+    <source id="joints"><Name_array id="joints-array" count="2">j0 j1</Name_array><technique_common><accessor source="#joints-array" count="2" stride="1"><param name="JOINT" type="Name"/></accessor></technique_common></source>
+    <source id="ibm"><float_array id="ibm-array" count="32">1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 1 0 0 0 0 1 0 0 0 0 1 0 1 0 0 1</float_array><technique_common><accessor source="#ibm-array" count="2" stride="16"><param name="TRANSFORM" type="float4x4"/></accessor></technique_common></source>
+    <source id="weights"><float_array id="weights-array" count="2">1 .5</float_array><technique_common><accessor source="#weights-array" count="2" stride="1"><param name="WEIGHT" type="float"/></accessor></technique_common></source>
+    <joints><input semantic="JOINT" source="#joints"/><input semantic="INV_BIND_MATRIX" source="#ibm"/></joints>
+    <vertex_weights count="4"><input semantic="JOINT" source="#joints" offset="0"/><input semantic="WEIGHT" source="#weights" offset="1"/><vcount>1 1 1 1</vcount><v>0 0 0 0 1 1 1 1</v></vertex_weights>
+  </skin></controller></library_controllers>
+  <library_visual_scenes><visual_scene id="Scene"><node id="root" name="Root"><translate>2 0 0</translate><node id="child"><rotate>0 0 1 90</rotate><instance_geometry url="#geo"/></node><instance_controller url="#skin"><skeleton>#j0</skeleton></instance_controller></node></visual_scene></library_visual_scenes>
+  <scene><instance_visual_scene url="#Scene"/></scene>
+</COLLADA>
