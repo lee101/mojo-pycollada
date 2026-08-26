@@ -1,36 +1,34 @@
 """Hot-path COLLADA kernels exposed through a deliberately small C ABI."""
 
-from std.algorithm.functional import parallelize
 from std.sys import simd_width_of
 
-comptime Ptr = UnsafePointer[Float64, AnyOrigin[mut=True]]
-comptime IPtr = UnsafePointer[Int64, AnyOrigin[mut=True]]
+comptime Ptr = Pointer[Float64, AnyOrigin[mut=True]]
+comptime IPtr = Pointer[Int64, AnyOrigin[mut=True]]
 comptime W = simd_width_of[DType.float64]()
-comptime EXPAND_PARALLEL_THRESHOLD = 131_072
-comptime EXPAND_CHUNK_SIZE = 32_768
-comptime EXPAND_WORKERS = 8
 
 
 def expand_range(
     src: Ptr, indices: IPtr, dst: Ptr, start: Int, stop: Int, stride: Int
 ):
     for i in range(start, stop):
-        var index = Int(indices.load(i))
+        var index = Int(indices.unsafe_load(i))
         var source_base = index * stride
         var destination_base = i * stride
         if stride == 3:
-            dst.store(destination_base, src.load(source_base))
-            dst.store(destination_base + 1, src.load(source_base + 1))
-            dst.store(destination_base + 2, src.load(source_base + 2))
+            dst.unsafe_store(destination_base, src.unsafe_load(source_base))
+            dst.unsafe_store(destination_base + 1, src.unsafe_load(source_base + 1))
+            dst.unsafe_store(destination_base + 2, src.unsafe_load(source_base + 2))
         else:
             var j = 0
             while j + W <= stride:
-                dst.store(
-                    destination_base + j, src.load[width=W](source_base + j)
+                dst.unsafe_store(
+                    destination_base + j, src.unsafe_load[width=W](source_base + j)
                 )
                 j += W
             while j < stride:
-                dst.store(destination_base + j, src.load(source_base + j))
+                dst.unsafe_store(
+                    destination_base + j, src.unsafe_load(source_base + j)
+                )
                 j += 1
 
 
@@ -41,17 +39,7 @@ def mpc_expand_f64(
     var src = Ptr(unsafe_from_address=src_addr)
     var indices = IPtr(unsafe_from_address=indices_addr)
     var dst = Ptr(unsafe_from_address=dst_addr)
-    if count >= EXPAND_PARALLEL_THRESHOLD:
-
-        def expand_chunk(chunk: Int) capturing:
-            var start = chunk * EXPAND_CHUNK_SIZE
-            var stop = min(start + EXPAND_CHUNK_SIZE, count)
-            expand_range(src, indices, dst, start, stop, stride)
-
-        var chunks = (count + EXPAND_CHUNK_SIZE - 1) // EXPAND_CHUNK_SIZE
-        parallelize[expand_chunk](chunks, EXPAND_WORKERS)
-    else:
-        expand_range(src, indices, dst, 0, count, stride)
+    expand_range(src, indices, dst, 0, count, stride)
 
 
 @export("mpc_mat4_multiply")
@@ -67,10 +55,10 @@ def mpc_mat4_multiply(
             for col in range(4):
                 var total = 0.0
                 for k in range(4):
-                    total += left.load(base + row * 4 + k) * right.load(
+                    total += left.unsafe_load(base + row * 4 + k) * right.unsafe_load(
                         base + k * 4 + col
                     )
-                dst.store(base + row * 4 + col, total)
+                dst.unsafe_store(base + row * 4 + col, total)
 
 
 @export("mpc_skin_vertices")
@@ -90,35 +78,35 @@ def mpc_skin_vertices(
     var weights = Ptr(unsafe_from_address=weights_addr)
     var dst = Ptr(unsafe_from_address=dst_addr)
     for vertex in range(vertex_count):
-        var x = positions.load(vertex * 3)
-        var y = positions.load(vertex * 3 + 1)
-        var z = positions.load(vertex * 3 + 2)
+        var x = positions.unsafe_load(vertex * 3)
+        var y = positions.unsafe_load(vertex * 3 + 1)
+        var z = positions.unsafe_load(vertex * 3 + 2)
         var ox = 0.0
         var oy = 0.0
         var oz = 0.0
         for influence in range(
-            Int(offsets.load(vertex)), Int(offsets.load(vertex + 1))
+            Int(offsets.unsafe_load(vertex)), Int(offsets.unsafe_load(vertex + 1))
         ):
-            var base = Int(joints.load(influence)) * 16
-            var weight = weights.load(influence)
+            var base = Int(joints.unsafe_load(influence)) * 16
+            var weight = weights.unsafe_load(influence)
             ox += weight * (
-                matrices.load(base) * x
-                + matrices.load(base + 1) * y
-                + matrices.load(base + 2) * z
-                + matrices.load(base + 3)
+                matrices.unsafe_load(base) * x
+                + matrices.unsafe_load(base + 1) * y
+                + matrices.unsafe_load(base + 2) * z
+                + matrices.unsafe_load(base + 3)
             )
             oy += weight * (
-                matrices.load(base + 4) * x
-                + matrices.load(base + 5) * y
-                + matrices.load(base + 6) * z
-                + matrices.load(base + 7)
+                matrices.unsafe_load(base + 4) * x
+                + matrices.unsafe_load(base + 5) * y
+                + matrices.unsafe_load(base + 6) * z
+                + matrices.unsafe_load(base + 7)
             )
             oz += weight * (
-                matrices.load(base + 8) * x
-                + matrices.load(base + 9) * y
-                + matrices.load(base + 10) * z
-                + matrices.load(base + 11)
+                matrices.unsafe_load(base + 8) * x
+                + matrices.unsafe_load(base + 9) * y
+                + matrices.unsafe_load(base + 10) * z
+                + matrices.unsafe_load(base + 11)
             )
-        dst.store(vertex * 3, ox)
-        dst.store(vertex * 3 + 1, oy)
-        dst.store(vertex * 3 + 2, oz)
+        dst.unsafe_store(vertex * 3, ox)
+        dst.unsafe_store(vertex * 3 + 1, oy)
+        dst.unsafe_store(vertex * 3 + 2, oz)
