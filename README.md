@@ -76,18 +76,21 @@ asset data, skin influence tables, and scene transforms. Kernel results are
 also checked against NumPy references.
 
 Measured with `pixi run bench` on Linux 6.8, dual Intel Xeon E5-2697 v4
-(72 logical CPUs), using Mojo `1.0.0b3.dev2026072406`, NumPy from the Pixi
+(72 logical CPUs), using Mojo `1.1.0.dev2026081105`, NumPy from the Pixi
 environment, and pycollada 0.9.3:
 
 | case | mojo-pycollada | pycollada / NumPy | result |
 | --- | ---: | ---: | --- |
-| indexed position expansion (1.5M vertices) | 13.92 ms | 82.11 ms | 5.90x faster |
-| DAE geometry/controller/scene load (fixture) | 0.85 ms | 0.97 ms | 1.15x faster |
+| indexed position expansion (1.5M vertices) | 14.88 ms | 252.53 ms | 16.97x faster |
+| DAE geometry/controller/scene load (fixture) | 0.66 ms | 1.01 ms | 1.52x faster |
 
-The native expansion kernel uses SIMD for contiguous source rows and chunks
-large independent expansions across CPU workers. No GPU path is provided:
-expansion is gather and memory-bandwidth bound, while the matrix and skinning
-kernels are below the arithmetic intensity needed to outweigh device transfers.
+The native expansion kernel uses SIMD for contiguous source rows, including a
+scalar remainder. Small expansions and single scene-transform products stay in
+NumPy because native-call overhead dominates at those sizes; large buffers cross
+the FFI without a copy. No parallel or GPU path is provided: the only benchmark
+target near parity is small, expansion is gather and memory-bandwidth bound, and
+the matrix and skinning kernels are below the roughly two-flops-per-byte
+arithmetic intensity needed to outweigh scheduling or device transfers.
 
 Reproduce exactly with:
 

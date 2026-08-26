@@ -28,21 +28,23 @@ class Skin:
         self.vcounts = self.vertex_weight_counts
         self.joint_indices = np.ascontiguousarray(joint_indices, dtype=np.int64)
         self.weight_indices = np.ascontiguousarray(weight_indices, dtype=np.int64)
-        if np.any(self.vertex_weight_counts < 0):
+        if self.vertex_weight_counts.min(initial=0) < 0:
             raise ValueError("vertex influence counts must be non-negative")
         influence_count = int(self.vertex_weight_counts.sum())
         if len(self.joint_indices) != influence_count or len(self.weight_indices) != influence_count:
             raise ValueError("skin influence tables do not match vertex influence counts")
-        if np.any(self.joint_indices < 0) or np.any(self.joint_indices >= len(self.joint_names)):
+        if self.joint_indices.min(initial=0) < 0 or self.joint_indices.max(initial=-1) >= len(self.joint_names):
             raise ValueError("skin joint index is outside the joint table")
-        if np.any(self.weight_indices < 0) or np.any(self.weight_indices >= len(self._weights)):
+        if self.weight_indices.min(initial=0) < 0 or self.weight_indices.max(initial=-1) >= len(self._weights):
             raise ValueError("skin weight index is outside the weight table")
         self.vertex_weight_index = np.ascontiguousarray(
             vertex_weight_index if vertex_weight_index is not None else np.column_stack((joint_indices, weight_indices)).reshape(-1),
             dtype=np.int64,
         )
         self.bind_shape_matrix = np.eye(4) if bind_shape_matrix is None else np.asarray(bind_shape_matrix, dtype=np.float64)
-        self._offsets = np.r_[0, np.cumsum(self.vertex_weight_counts, dtype=np.int64)]
+        self._offsets = np.empty(len(self.vertex_weight_counts) + 1, dtype=np.int64)
+        self._offsets[0] = 0
+        np.cumsum(self.vertex_weight_counts, dtype=np.int64, out=self._offsets[1:])
 
     def apply_skinning(self, vertices, joint_matrices):
         vertices = _lib.f64(vertices)

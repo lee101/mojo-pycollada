@@ -57,11 +57,17 @@ class Primitive:
         values = _lib.f64(source.data)
         if values.ndim != 2 or values.shape[1] <= 0:
             raise ValueError("source data must have shape (n, positive_stride)")
-        if len(index) and (index.min() < 0 or index.max() >= len(values)):
-            raise ValueError("primitive index is outside its source array")
         result = np.empty((len(index), values.shape[1]), dtype=np.float64)
-        # Avoid constructing pointers for zero-length user buffers.
-        if len(index):
+        if result.size < 4096:
+            if index.min(initial=0) < 0:
+                raise ValueError("primitive index is outside its source array")
+            try:
+                np.take(values, index, axis=0, out=result)
+            except IndexError as exc:
+                raise ValueError("primitive index is outside its source array") from exc
+        elif len(index):
+            if index.min() < 0 or index.max() >= len(values):
+                raise ValueError("primitive index is outside its source array")
             _lib.lib().mpc_expand_f64(_lib.addr(values), _lib.addr(index), _lib.addr(result), len(index), values.shape[1])
         return result
 

@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import numpy as np
 
-from . import _lib
-
 
 class GeometryNode:
     def __init__(self, geometry, materials=None):
@@ -36,11 +34,7 @@ class Node:
     def matrix(self):
         result = np.eye(4, dtype=np.float64)
         for transform in self.transforms:
-            right = np.ascontiguousarray(transform, dtype=np.float64).reshape(1, 4, 4)
-            left = result.reshape(1, 4, 4)
-            product = np.empty((1, 4, 4), dtype=np.float64)
-            _lib.lib().mpc_mat4_multiply(_lib.addr(left), _lib.addr(right), _lib.addr(product), 1)
-            result = product[0]
+            result = result @ transform
         return result
 
     def iter_nodes(self, parent_matrix=None):

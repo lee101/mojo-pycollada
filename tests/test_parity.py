@@ -74,7 +74,19 @@ def test_indexed_expansion_matches_numpy_with_simd_tail():
     assert np.array_equal(actual, source[indices])
 
 
-def test_indexed_expansion_matches_numpy_at_parallel_threshold():
+def test_primitive_small_expansion_uses_numpy_threshold():
+    source = collada.FloatSource("positions", np.arange(30, dtype=float).reshape(10, 3))
+    inputs = collada.InputList()
+    inputs.addInput(0, "VERTEX", "#positions")
+    primitive = collada.TriangleSet(
+        np.array([[9], [0], [4]], dtype=np.int64),
+        inputs=inputs,
+        source_by_id={"positions": source},
+    )
+    assert np.array_equal(primitive.expanded_vertex, source.data[[9, 0, 4]])
+
+
+def test_indexed_expansion_matches_numpy_above_small_array_threshold():
     rng = np.random.default_rng(3)
     source = rng.normal(size=(257, 3))
     indices = rng.integers(0, len(source), size=131_073, dtype=np.int64)
@@ -89,6 +101,8 @@ def test_expansion_rejects_out_of_range_indices_before_entering_mojo():
     inputs.addInput(0, "VERTEX", "#positions")
     with np.testing.assert_raises_regex(ValueError, "outside"):
         collada.TriangleSet(np.array([[0], [1], [2]]), inputs=inputs, source_by_id={"positions": source})
+    with np.testing.assert_raises_regex(ValueError, "outside"):
+        collada.TriangleSet(np.array([[0], [1], [-1]]), inputs=inputs, source_by_id={"positions": source})
 
 
 def test_skinning_rejects_lossy_input_and_empty_expansion_is_safe():
@@ -144,3 +158,14 @@ def test_source_accessor_offset_and_unsupported_primitives_are_explicit():
     assert np.array_equal(collada.Collada(document).geometries[0].sourceById["p"].data, [[1, 2, 3]])
     with np.testing.assert_raises_regex(collada.ColladaError, "unsupported mesh primitive"):
         collada.Collada(b"<COLLADA><library_geometries><geometry><mesh><lines/></mesh></geometry></library_geometries></COLLADA>")
+
+
+def test_large_numeric_source_parses_exactly():
+    values = " ".join(str(value) for value in range(120))
+    document = f"""<COLLADA><library_geometries><geometry id='g'><mesh>
+    <source id='p'><float_array>{values}</float_array><technique_common>
+    <accessor count='40' stride='3'/></technique_common></source>
+    <vertices id='v'><input semantic='POSITION' source='#p'/></vertices>
+    </mesh></geometry></library_geometries></COLLADA>""".encode()
+    actual = collada.Collada(document).geometries[0].sourceById["p"].data
+    assert np.array_equal(actual, np.arange(120, dtype=float).reshape(40, 3))

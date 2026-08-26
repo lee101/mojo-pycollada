@@ -44,15 +44,25 @@ def _tag(node):
 
 
 def _children(node, name):
-    return [child for child in node if _tag(child) == name]
+    namespaced = "}" + name
+    return [child for child in node if child.tag == name or child.tag.endswith(namespaced)]
 
 
 def _child(node, name):
-    return next(iter(_children(node, name)), None)
+    namespaced = "}" + name
+    for child in node:
+        if child.tag == name or child.tag.endswith(namespaced):
+            return child
+    return None
 
 
 def _numbers(node, dtype=float):
-    return [] if node is None or not (node.text or "").strip() else [dtype(value) for value in node.text.split()]
+    text = "" if node is None else (node.text or "").strip()
+    if not text:
+        return []
+    if len(text) >= 256:
+        return np.fromstring(text, dtype=dtype, sep=" ")
+    return [dtype(value) for value in text.split()]
 
 
 def _matrix(values):
@@ -234,8 +244,7 @@ class Collada:
                 raise DaeMalformedError("skin vertex weight stream does not match vcount")
             raw = flat.reshape((-1, width))
             bind = _child(skin, "bind_shape_matrix")
-            inverse = sources[joint_inputs["INV_BIND_MATRIX"]].data
-            inverse = np.stack([_matrix(row) for row in inverse])
+            inverse = sources[joint_inputs["INV_BIND_MATRIX"]].data.reshape((-1, 4, 4)).transpose((0, 2, 1))
             weight_source = sources[next(item.get("source").lstrip("#") for item in weight_inputs if item.get("semantic") == "WEIGHT")]
             geometry_id = skin.get("source").lstrip("#")
             controller = Skin(node.get("id"), geometry_id, sources[joint_inputs["JOINT"]], inverse,
